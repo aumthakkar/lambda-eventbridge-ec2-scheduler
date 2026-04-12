@@ -1,0 +1,45 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowCloudWatchLogging",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "AllowEC2Actions",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:StartInstances",
+				        "ec2:StopInstances",
+				        "ec2:DescribeInstances",
+				        "ec2:DescribeVolumes"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "AllowLambdaInvocation",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": [
+                "arn:aws:lambda:us-east-1:650251713601:function:ec2-scheduler:*",
+                "arn:aws:lambda:us-east-1:650251713601:function:ec2-scheduler"
+            ]
+        },
+        {
+            "Sid": "AllowSQSSendToDLQ",
+            "Effect": "Allow",
+            "Action": [
+                "sqs:SendMessage"
+            ],
+            "Resource": "arn:aws:sqs:us-east-1:650251713601:ec2-scheduler-DLQ"
+        }
+    ]
+}
