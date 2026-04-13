@@ -16,9 +16,9 @@
             "Effect": "Allow",
             "Action": [
                 "ec2:StartInstances",
-				        "ec2:StopInstances",
-				        "ec2:DescribeInstances",
-				        "ec2:DescribeVolumes"
+                "ec2:StopInstances",
+                "ec2:DescribeInstances",
+                "ec2:DescribeVolumes"
             ],
             "Resource": "*"
         },

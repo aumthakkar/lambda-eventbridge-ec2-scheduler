@@ -10,6 +10,8 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
 
 ## Architecture
 
+![alt text](architecture.png)
+
 ### Event Scheduling Layer
 - Two separate cron-based schedules are configured in EventBridge Scheduler:
   - One for starting instances with payload: `{ "action": "start" }`
@@ -41,7 +43,12 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
 ## Setup / Deployment
 
 **1. Create an IAM role for Lambda with permissions:**
-
+     First, provide sts:AssumeRole Action (Trust Relationship) on this role to the following services:
+     - lambda.amazonaws.com
+     - scheduler.amazonaws.com
+     - events.amazonaws.com
+     
+     Then provide the following IAM permissions to this role:
      CloudWatch actions:
      - logs:CreateLogGroup
      - logs:CreateLogStream
@@ -52,12 +59,12 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
      - ec2:StopInstances
      - ec2:DescribeInstances
 
-     Lambda invoke permission:
+     Lambda invoke permission for EventBridge Scheduler:
      - lambda:InvokeFunction
   
      SQS permission (DLQ):
      - sqs:SendMessage
-
+  
 **2. Deploy the Lambda function:**
    - Upload the Python code (**ec2_scheduler.py**) from this repo via AWS Console or CLI
 
@@ -105,3 +112,11 @@ The solution was tested by:
 - Validating logs in CloudWatch 
 - Confirming failed events are captured in SQS DLQ
 - Intentionally failing the Lambda function (e.g. removing EC2 permissions) and verifying SNS email alerts for Lambda Errors
+
+
+## Future Enhancements
+
+- Infrastructure provisioning using Terraform for fully automated deployment
+- Tag-based scheduling with support for multiple environments (e.g. Dev, UAT, Prod)
+- Integration with Slack or Microsoft Teams for alert notifications
+- Enhanced error handling and retry mechanisms for Lambda execution failures
