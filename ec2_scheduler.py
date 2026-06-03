@@ -18,9 +18,9 @@ def lambda_handler(event, context):
     )    
     instance_ids = []
 
-    for reservation in response['Reservations']:
-        for instance in reservation['Instances']:
-            instance_ids.append(instance['InstanceId'])
+    for reservation in response.get('Reservations',[]):
+        for instance in reservation.get('Instances',[]):
+            instance_ids.append(instance.get('InstanceId'))
 
     print(f"Scheduled Instances: {instance_ids}")
 
