@@ -1,10 +1,11 @@
 # AWS Lambda + EventBridge EC2 Scheduler
 
 ## Description
-Event-driven automation to start and stop EC2 instances using AWS Lambda, EventBridge and Boto3.
+Event-driven automation to start and stop EC2 instances across multiple environments using AWS Lambda, EventBridge and Boto3.
 
 ## Features
 - Scheduled automation
+- Environment-aware instance targeting (Dev, UAT, Prod)
 - Cost optimisation use case
 - Serverless architecture
 
@@ -13,30 +14,29 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
 ![alt text](architecture.png)
 
 ### Event Scheduling Layer
-- Two separate cron-based schedules are configured in EventBridge Scheduler:
-  - One for starting instances with payload: `{ "action": "start" }`
-  - One for stopping instances with payload: `{ "action": "stop" }`
-- Each schedule emits a structured event payload (`action=start/stop`), allowing the Lambda function to dynamically determine execution behaviour
-- Enables fully automated, time-based infrastructure control without manual intervention
+- Separate cron-based schedules are configured in EventBridge Scheduler per environment and action.
+- Each schedule emits a structured JSON event payload containing both the required `action` and the target `environment` (e.g., `{ "action": "start", "environment": "dev" }`).
+- This allows the Lambda function to dynamically determine execution behaviour and target the exact subset of instances needed.
+- Enables fully automated, time-based infrastructure control without manual intervention or hardcoded schedules.
 
 ### Compute Layer (Serverless Orchestration)
-- The schedule triggers an AWS Lambda function
-- AWS Lambda acts as the orchestration engine, executing logic without provisioning or managing servers
+- The schedule triggers an AWS Lambda function.
+- AWS Lambda acts as the orchestration engine, executing logic without provisioning or managing servers.
 
 ### Execution & AWS Integration (Lambda Function)
-- Uses Boto3 to interact programmatically with AWS resources
-- Dynamically filters EC2 instances using tags (e.g. `Environment=Dev`, `AutoSchedule=True`)
-- Determines actions (start/stop) based on event context
+- Uses Boto3 to interact programmatically with AWS resources.
+- Dynamically filters EC2 instances using exact case-sensitive tags (e.g. `Environment=Dev`, `AutoSchedule=True`).
+- Determines actions (start/stop) based on event context.
 
 ### Resource Management Layer
-- EventBridge defines *when* actions occur, while Lambda + Boto3 define *what* actions are executed on EC2 resources
-- Ensures non-production resources run only when needed, reducing unnecessary compute usage
+- EventBridge defines *when* actions occur and *which* environment is targeted, while Lambda + Boto3 define *what* actions are executed on EC2 resources.
+- Ensures environment resources run only when needed, reducing unnecessary compute usage across non-production and staging environments.
 
 ### Observability, Monitoring & Alerting
-- Logs and execution metrics are captured in Amazon CloudWatch
-- Enables debugging, auditing, and basic operational monitoring through logs and metrics
-- A Dead-Letter Queue (DLQ) using SQS is configured on EventBridge Scheduler to capture failed event triggers
-- Lambda function errors are captured using a CloudWatch Alarm, which triggers an SNS topic to send email notifications
+- Logs and execution metrics are captured in Amazon CloudWatch.
+- Enables debugging, auditing, and basic operational monitoring through logs and metrics.
+- A Dead-Letter Queue (DLQ) using SQS is configured on EventBridge Scheduler to capture failed event triggers.
+- Lambda function errors are captured using a CloudWatch Alarm, which triggers an SNS topic to send email notifications.
 
 ---
 
@@ -52,7 +52,7 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
      CloudWatch actions:
      - logs:CreateLogGroup
      - logs:CreateLogStream
-     - logs:PutLogEvents
+     - logs:PutLogEvents 
 
      EC2 permissions:
      - ec2:StartInstances
@@ -66,34 +66,45 @@ Event-driven automation to start and stop EC2 instances using AWS Lambda, EventB
      - sqs:SendMessage
   
 **2. Deploy the Lambda function:**
-   - Upload the Python code (**ec2_scheduler.py**) from this repo via AWS Console or CLI
+   - Upload the Python code (**ec2_scheduler.py**) from this repo via AWS Console or CLI.
 
 **3. Create EventBridge Scheduler rules:**
-   - Start schedule → `cron(0 8 ? * MON-FRI *)` with payload `{ "action": "start" }`
-   - Stop schedule → `cron(0 18 ? * MON-FRI *)` with payload `{ "action": "stop" }`
+   Configure independent schedules to match your environment's operational hours:
+   - **Dev Start schedule** → `cron(0 8 ? * MON-FRI *)` with payload `{ "action": "start", "environment": "dev" }`
+   - **Dev Stop schedule** → `cron(0 18 ? * MON-FRI *)` with payload `{ "action": "stop", "environment": "dev" }`
+   - **Prod Start schedule** → `cron(0 5 ? * * *)` with payload `{ "action": "start", "environment": "prod" }`
+   - **Prod Stop schedule** → `cron(0 23 ? * * *)` with payload `{ "action": "stop", "environment": "prod" }`
 
 **4. Configure target EC2 instances:**
-   - Add tags:
-     - AutoSchedule = True
-     - Environment = Dev
+   - Add the following exact case-sensitive tags to instances you want managed:
+     - `AutoSchedule` = `True`
+     - `Environment` = `Dev` (or `Uat`, `Prod`, etc. to match your payload)
 
 **5. Create CloudWatch Alarm:**
-   - Configure a `Lambda <FunctionName>:Errors` metric alarm with **Sum** statistic
-   - Set threshold to `Errors >= 1`
-   - Create an SNS topic with your email endpoint and link it to the alarm
+   - Configure a `Lambda <FunctionName>:Errors` metric alarm with **Sum** statistic.
+   - Set threshold to `Errors >= 1`.
+   - Create an SNS topic with your email endpoint and link it to the alarm.
 
 ---
 
 ## Example Lambda Logic
 
 ```python
-action = event.get("action")
+action = event.get("action", "").strip().lower()
+environment = event.get("environment", "").strip().lower()
+
+# Dynamic filtering using environment context
+response = ec2.describe_instances(
+    Filters=[
+        {'Name': 'tag:AutoSchedule', 'Values': ['True']},
+        {'Name': 'tag:Environment', 'Values': [environment.capitalize()]}
+    ]
+)
 
 if action == "start":
-    ec2.start_instances(...)
+    ec2.start_instances(InstanceIds=instance_ids)
 elif action == "stop":
-    ec2.stop_instances(...)
-```
+    ec2.stop_instances(InstanceIds=instance_ids)
 
 ## Use Case
 
