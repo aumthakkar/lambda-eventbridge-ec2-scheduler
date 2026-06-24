@@ -128,6 +128,5 @@ The solution was tested by:
 ## Future Enhancements
 
 - Infrastructure provisioning using Terraform for fully automated deployment
-- Tag-based scheduling with support for multiple environments (e.g. Dev, UAT, Prod)
 - Integration with Slack or Microsoft Teams for alert notifications
 - Enhanced error handling and retry mechanisms for Lambda execution failures
